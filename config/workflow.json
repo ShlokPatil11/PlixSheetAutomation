@@ -1,0 +1,48 @@
+{
+  "terminalStates": ["published", "cancelled"],
+  "states": {
+    "draft": { "label": "Brand intake", "tone": "neutral" },
+    "social_research": { "label": "Script queue", "tone": "indigo" },
+    "script_approval_pending": { "label": "Brand script approval", "tone": "amber" },
+    "script_changes_requested": { "label": "Script changes", "tone": "rose" },
+    "editing_queue": { "label": "Video queue", "tone": "indigo" },
+    "editing_in_progress": { "label": "Video production", "tone": "blue" },
+    "approval_pending": { "label": "Brand video approval", "tone": "amber" },
+    "changes_requested": { "label": "Video changes requested", "tone": "rose" },
+    "approved": { "label": "Approved", "tone": "green" },
+    "ready_for_performance": { "label": "Ready for live", "tone": "teal" },
+    "publishing_in_progress": { "label": "Rework", "tone": "blue" },
+    "published": { "label": "Live", "tone": "green" },
+    "on_hold": { "label": "On hold", "tone": "neutral" },
+    "blocked": { "label": "Blocked", "tone": "rose" },
+    "publishing_failed": { "label": "Failed / On hold", "tone": "rose" },
+    "cancelled": { "label": "Cancelled", "tone": "neutral" },
+    "closed_legacy": { "label": "Closed (legacy)", "tone": "neutral" }
+  },
+  "transitions": {
+    "draft": ["social_research", "cancelled"],
+    "social_research": ["draft", "script_approval_pending", "blocked", "on_hold", "cancelled"],
+    "script_approval_pending": ["editing_queue", "script_changes_requested", "on_hold", "cancelled"],
+    "script_changes_requested": ["draft", "script_approval_pending", "cancelled"],
+    "editing_queue": ["editing_in_progress", "script_approval_pending", "blocked", "on_hold", "cancelled"],
+    "editing_in_progress": ["approval_pending", "script_approval_pending", "blocked", "on_hold", "cancelled"],
+    "approval_pending": ["approved", "changes_requested", "on_hold", "cancelled"],
+    "changes_requested": ["editing_in_progress", "script_approval_pending", "on_hold", "cancelled"],
+    "approved": ["ready_for_performance", "changes_requested"],
+    "ready_for_performance": ["publishing_in_progress", "changes_requested", "blocked", "on_hold"],
+    "publishing_in_progress": ["published", "publishing_failed", "changes_requested"],
+    "publishing_failed": ["publishing_in_progress", "changes_requested", "on_hold", "cancelled"],
+    "blocked": ["editing_queue", "editing_in_progress", "ready_for_performance", "on_hold", "cancelled"],
+    "on_hold": ["social_research", "script_approval_pending", "script_changes_requested", "editing_queue", "editing_in_progress", "approval_pending", "ready_for_performance", "cancelled"],
+    "published": [],
+    "cancelled": [],
+    "closed_legacy": []
+  },
+  "roleActions": {
+    "content": ["find_content", "assign_content_owner", "submit_script", "replace_script", "comment"],
+    "edit": ["assign_editor", "start_editing", "submit_version", "comment", "block_task"],
+    "brand": ["create_brief", "edit_brief", "submit_brief", "approve", "request_changes", "approve_script", "request_script_changes", "comment"],
+    "performance": ["assign_publisher", "start_publishing", "record_publish_result", "comment"],
+    "administrator": ["create_brief", "edit_brief", "submit_brief", "find_content", "assign_content_owner", "submit_script", "replace_script", "assign_editor", "start_editing", "submit_version", "approve", "request_changes", "approve_script", "request_script_changes", "assign_publisher", "start_publishing", "record_publish_result", "comment", "block_task"]
+  }
+}

@@ -1,0 +1,10 @@
+.env
+.env.local
+*.pem
+*.key
+credentials*.json
+service-account*.json
+__pycache__/
+*.pyc
+.DS_Store
+

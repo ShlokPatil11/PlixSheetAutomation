@@ -1,0 +1,27 @@
+{
+  "source": {
+    "spreadsheetId": "17LzvdnEhp2Vf3Q8sjKVDL2bmXYB3ZimBNIp8PVIaMgw",
+    "requestedGid": "448450235",
+    "mode": "verified-read-only-public-export",
+    "liveVerified": true,
+    "writeEnabled": false,
+    "snapshotSha256": "A8791DF785F83D90D6B8F27F47F36494F7B61619C34C840067879B9FCBDE80FB",
+    "liveExportSha256": "A0D9A350150C4934719EA80E823AD59949B67797C0C63C320F4C220FE92AB7AF",
+    "verifiedAt": "2026-10-14T12:53:08+05:30"
+  },
+  "sheets": [
+    {"name":"EXECUTIVE DASHBOARD","purpose":"Daily and category-level workflow totals.","populatedRows":40,"fields":["Date","Category","Type","Videos Done Today","Script Approval Pending","Video Approval Pending","Baseline"],"features":["26 formulas","Cross-sheet COUNTIFS","Manual baseline"]},
+    {"name":"BrandPerf","purpose":"Campaign and performance request intake.","populatedRows":125,"fields":["Date","Campaign","Roas","Spends","Priority","Category","Requirement Given","Comments","Perf"],"features":["Free-text intake","Mixed date formats","No validation"]},
+    {"name":"Work Plan","purpose":"Primary non-AI editing and delivery tracker.","populatedRows":228,"fields":["Date","Shoot Date","Category","Type of Edit","Content Dependency","Product Name","Reference Link","Script","Brand Comment","Priority","Script/Edit Status","Editor","Script Comment","Name","Hook Name","Drive Link","Status"],"features":["Dropdown validation","Shared product formula","Threaded comments","Hyperlinks","Frozen header"]},
+    {"name":"AI Tracker Main","purpose":"AI-oriented script, approval, and editing tracker.","populatedRows":135,"fields":["Date","Category","Type of Edit","Content Dependency","Product Name","Reference","Hooks","Comments","Script Link","Brand Team Comment","Priority","Script Status","Editor","Status","Hook Name","Drive Link","Live"],"features":["Calculated dependency","Dropdown validation","Threaded comments","Existing #REF! value"]},
+    {"name":"Joyun Work Plan Final","purpose":"Small finalized Joyun workflow subset.","populatedRows":8,"fields":["Entry Date","Shoot Date","Category","Name","Type of Edit","Reference Link","Hook Name","Comments","Script Link","Brand Team Comment","Priority","Script Status","Editor","Product Name","Drive Link","Live","Status"],"features":["Dropdown validation","Threaded comment","Relationship to older Joyun tab unresolved"]},
+    {"name":"Shoot Requirement","purpose":"Current shoot requirements organized by category and talent gender.","populatedRows":17,"fields":["Date","Skin","Hair","Nutra","Joyun","Special Requirement"],"features":["Presentation matrix","Merged headers","Not row-normalized"]},
+    {"name":"Joyun Work Plan","purpose":"Older or parallel Joyun editing tracker.","populatedRows":26,"fields":["Date","Shoot Date","Category","Type","Type of Edit","Product Name","Hooks","Reference","Script","Comments","Priority","Editor","Drive Link","Status","Live"],"features":["Dropdown validation","Hyperlinks","Canonical status unresolved"]},
+    {"name":"Pack Details","purpose":"Placeholder for brand-owned pack information.","populatedRows":1,"fields":["Brand team to add"],"features":["Placeholder only"]},
+    {"name":"Script Bank","purpose":"Script concepts, owners, avatar, edit owner, and video status.","populatedRows":37,"fields":["Date","POC","Product","Concept","AI Avatar","Script","Script Status","Edit Team POC","Video Status","Reference Product","Reference Link","Comment","Status","Avatar","Script Link"],"features":["Two logical sections","Hyperlinks","No validation"]},
+    {"name":"Static","purpose":"Static creative asset inventory.","populatedRows":31,"fields":["Category","Product","Type","Drive Link"],"features":["Drive hyperlinks","No validation"]},
+    {"name":"Content Bank","purpose":"Reference-content library with optional comments and scripts.","populatedRows":93,"fields":["Product","Link","Comment","Status","Avatar","Script Link"],"features":["Hyperlinks","Threaded comment","Two-row header"]},
+    {"name":"Avatars and Personalities","purpose":"Creator and avatar directory.","populatedRows":7,"fields":["Creator Name","Type","Drive Link","Category","Insta Handle"],"features":["Drive/social links","Threaded comment"]},
+    {"name":"Shoot Requirement (History)","purpose":"Historical shoot requirements arranged by date columns.","populatedRows":30,"fields":["Date group","Talent gender","Requirement","Reference"],"features":["Column-oriented history","Hyperlinks","Not row-normalized"]}
+  ]
+}
