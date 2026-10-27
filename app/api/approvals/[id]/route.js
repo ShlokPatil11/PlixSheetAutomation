@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { FALLBACK_VIDEO_EDITOR } from "@/lib/workflow/constants";
 import { transitionTask } from "@/lib/workflow/engine";
 import { mutateState } from "@/lib/store/unified-store";
 
@@ -42,9 +41,12 @@ export async function POST(request, context) {
         `Brand decision on ${type}: ${decision}. ${comment}`.trim()
       );
 
-      // Auto-assign fallback editor if unassigned when entering video queue
-      if (nextState === "editing_queue" && !updated.editorId) {
-        updated.editorId = FALLBACK_VIDEO_EDITOR.id;
+      // Approved scripts must enter the shared manager dispatch queue unassigned.
+      if (nextState === "editing_queue") {
+        updated.editorId = null;
+        updated.editorAssignedById = null;
+        updated.editorAssignedByName = null;
+        updated.editorAssignedAt = null;
       }
 
       // Update approval record status

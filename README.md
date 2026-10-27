@@ -10,7 +10,7 @@ A complete, full-stack Next.js web application that unifies **Brand**, **Content
    * Each team operates in a focused queue with irrelevant upstream/downstream clutter removed.
    * **Brand Team**: Brief intake, Hook configuration, Script approval gate, Video review gate, and campaign oversight.
    * **Content Team**: Script queue, Category auto-routing (Skin $\rightarrow$ Himani, Hair $\rightarrow$ Zoha, Nutra $\rightarrow$ Tanmay), Google Docs script submissions.
-   * **Video Team**: Receives Brand-approved brief and script, automatic fallback editor `Other`, Google Drive video cut submissions with aspect ratios (9:16, 16:9, 1:1).
+   * **Video Team**: Brand-approved scripts enter a shared dispatch queue. Editing managers Yogesh, Vihang, Pratik, and Pritam assign each task to a team member before production begins.
    * **Performance Team**: `Ready for Live` queue of Brand-approved videos, UTM tagging, and Go-Live publishing execution.
    * **Operations Admin**: End-to-end pipeline visibility, SLA tracking, and audit history.
 
@@ -20,7 +20,7 @@ A complete, full-stack Next.js web application that unifies **Brand**, **Content
 
 3. **Dual Persistence Architecture**:
    * **Zero-Setup Local Mode**: Runs out of the box with atomic file storage (`.data/unified-state.json`), Server-Sent Events (`/api/events`), and seed data from `Brand Perf Edit.xlsx` (353 records).
-   * **Supabase / PostgreSQL Ready**: Full schema and Row-Level Security (RLS) migration included in `supabase/migrations/20261023160000_plix_unified_ops_schema.sql`.
+   * **Supabase Mode**: Setting `NEXT_PUBLIC_SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` switches the runtime to shared Supabase persistence. Optimistic revision checks protect concurrent manager assignments and Supabase Realtime feeds the existing event stream.
 
 ---
 
@@ -92,15 +92,27 @@ plix-unified-ops/
    └── Delivered to: Brand Gate ("Brand script approval")
 
 3. Brand approves script
-   └── Delivered to: Video Team ("Video queue", fallback editor: 'Other')
+   └── Delivered unassigned to: Editing Manager Dispatch Desk
 
-4. Video editor cuts video and submits Google Drive link (9:16 / 16:9)
+4. Yogesh, Vihang, Pratik, or Pritam assigns an editor
+   └── Delivered to: Assigned editor's personal production queue
+
+5. Video editor cuts video and submits Google Drive link (9:16 / 16:9)
    └── Delivered to: Brand Gate ("Brand video review")
 
-5. Brand approves video
+6. Brand approves video
    └── Delivered to: Performance Team ("Ready for live")
 
-6. Performance team configures UTMs and records Live URL
+7. Performance team configures UTMs and records Live URL
    └── Delivered to: Live in Market ("published") + Full Pipeline Completion
 ```
+
+### Supabase editing-manager setup
+
+1. Apply all migrations in `supabase/migrations` in timestamp order.
+2. Copy `.env.local.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and the server-only `SUPABASE_SERVICE_ROLE_KEY`.
+3. Restart the application. The first request seeds `plix_app_state`; subsequent reads and writes use Supabase.
+4. Open `/api/health/supabase` and confirm that `connected` is `true`.
+
+After creating the four manager accounts in Supabase Auth, set their `workspace_members.team` to `video` and `team_role` to `manager`. All other editors should use `team_role = 'member'`. The manager API also enforces assignment permissions from the active application session.
 

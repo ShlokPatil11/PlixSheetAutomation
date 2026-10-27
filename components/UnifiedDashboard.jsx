@@ -6,9 +6,9 @@ import {
   Folder, FolderOpen, LayoutDashboard, List, LogOut, Menu, MessageSquareWarning,
   PlayCircle, Plus, Rocket, Search, Send, Smartphone, Sparkles, Video, X
 } from "lucide-react";
-import { CATEGORY_ROUTING, CONTENT_TYPES_BY_BRIEF, FALLBACK_VIDEO_EDITOR, TEAM_VISIBLE_STATES } from "@/lib/workflow/constants";
+import { CATEGORY_ROUTING, CONTENT_TYPES_BY_BRIEF, TEAM_VISIBLE_STATES } from "@/lib/workflow/constants";
 import plixProductsCatalog from "@/data/plix-products.json";
-import { computePipelineMetrics, transitionTask } from "@/lib/workflow/engine";
+import { computePipelineMetrics } from "@/lib/workflow/engine";
 import {
   NotificationService,
   INITIAL_NOTIFICATIONS,
@@ -161,8 +161,107 @@ function OwnerSelect({ task, writers, onChange, compact = false }) {
   );
 }
 
+function EditorSelect({ task, editors, onChange, compact = false }) {
+  return (
+    <select
+      className={`owner-select ${compact ? "compact" : ""}`}
+      value={task.editorId || ""}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => onChange(task.id, event.target.value)}
+      aria-label={`Assign editor for ${task.title}`}
+    >
+      <option value="">Unassigned</option>
+      {editors.map((editor) => <option value={editor.id} key={editor.id}>{editor.name}</option>)}
+    </select>
+  );
+}
+
+function EditingDispatchDesk({ tasks, editors, users, onOpen, onAssign }) {
+  const groups = [
+    {
+      id: "unassigned",
+      label: "Needs assignment",
+      help: "Approved scripts waiting for a manager",
+      items: tasks.filter((task) => task.state === "editing_queue" && !task.editorId),
+    },
+    {
+      id: "assigned",
+      label: "Assigned",
+      help: "Allocated to an editor, not started yet",
+      items: tasks.filter((task) => task.state === "editing_queue" && task.editorId),
+    },
+    {
+      id: "production",
+      label: "In production",
+      help: "Active edits and requested rework",
+      items: tasks.filter((task) => ["editing_in_progress", "changes_requested"].includes(task.state)),
+    },
+    {
+      id: "review",
+      label: "With Brand",
+      help: "Submitted cuts awaiting review",
+      items: tasks.filter((task) => task.state === "approval_pending"),
+    },
+  ];
+
+  return (
+    <section className="dispatch-desk">
+      <div className="dispatch-summary">
+        <div><strong>{groups[0].items.length}</strong><span>Unassigned scripts</span></div>
+        <div><strong>{groups[1].items.length}</strong><span>Assigned, waiting to start</span></div>
+        <div><strong>{groups[2].items.length}</strong><span>Active edits</span></div>
+        <div><strong>{editors.length}</strong><span>Available editors</span></div>
+      </div>
+
+      <div className="dispatch-columns">
+        {groups.map((group) => (
+          <section className="dispatch-column" key={group.id}>
+            <header>
+              <div><strong>{group.label}</strong><span>{group.help}</span></div>
+              <b>{group.items.length}</b>
+            </header>
+            <div className="dispatch-items">
+              {group.items.map((task) => {
+                const editor = users.find((user) => user.id === task.editorId);
+                return (
+                  <article className="dispatch-card" key={task.id} onClick={() => onOpen(task)}>
+                    <div className="dispatch-card-top">
+                      <span className="task-id-tag">{task.id}</span>
+                      <Priority value={task.priority} />
+                    </div>
+                    <h3>{task.title}</h3>
+                    <p>{task.product} · {task.contentType}</p>
+                    {task.scriptLink ? (
+                      <a href={task.scriptLink} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                        <FileText size={14} /> Open approved script <ExternalLink size={12} />
+                      </a>
+                    ) : <span className="missing-script">Script link unavailable</span>}
+                    <div className="dispatch-assignment">
+                      <label>Assigned editor</label>
+                      <EditorSelect task={task} editors={editors} onChange={onAssign} />
+                      {editor && (
+                        <small>
+                          <Avatar person={editor} small /> {editor.name}
+                          {task.editorAssignedByName ? ` · by ${task.editorAssignedByName}` : ""}
+                          {task.editorAssignedAt ? ` · ${formatDateTime(task.editorAssignedAt)}` : ""}
+                        </small>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
+              {!group.items.length && <div className="column-empty"><Check size={18} /><span>Nothing here</span></div>}
+            </div>
+          </section>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function TaskCard({ task, writers, users, onOpen, onAssign }) {
-  const writer = users.find((person) => person.id === (task.scriptOwnerId || task.contentOwnerId));
+  const isVideoTask = ["editing_queue", "editing_in_progress", "changes_requested", "approval_pending"].includes(task.state);
+  const owner = users.find((person) => person.id === (isVideoTask ? task.editorId : (task.scriptOwnerId || task.contentOwnerId)));
   const currentStage = (task.stageDurations || []).slice(-1)[0];
   const stageDuration = currentStage?.durationHours !== null && currentStage?.durationHours !== undefined
     ? `${currentStage.durationHours}h`
@@ -183,9 +282,9 @@ function TaskCard({ task, writers, users, onOpen, onAssign }) {
       <div className="card-assignment">
         <span>
           <b>Assigned owner</b>
-          <span className="owner"><Avatar person={writer} small />{writer?.name || "Unassigned"}</span>
+          <span className="owner"><Avatar person={owner} small />{owner?.name || "Unassigned"}</span>
         </span>
-        <OwnerSelect task={task} writers={writers} onChange={onAssign} compact />
+        {!isVideoTask && <OwnerSelect task={task} writers={writers} onChange={onAssign} compact />}
       </div>
       <div className="task-card-foot">
         <span>{task.id}</span>
@@ -478,7 +577,7 @@ function BrandFolderView({ tasks, onOpen, onCreateBrief, writers = [], users = [
   );
 }
 
-function TaskList({ tasks, writers, onOpen, onAssign }) {
+function TaskList({ tasks, writers, users, onOpen, onAssign }) {
   return (
     <section className="task-list panel">
       <table>
@@ -495,6 +594,8 @@ function TaskList({ tasks, writers, onOpen, onAssign }) {
         </thead>
         <tbody>
           {tasks.map((task) => {
+            const isVideoTask = ["editing_queue", "editing_in_progress", "changes_requested", "approval_pending"].includes(task.state);
+            const editor = users.find((user) => user.id === task.editorId);
             const currentStage = (task.stageDurations || []).slice(-1)[0];
             const durationLabel = currentStage?.durationHours !== null && currentStage?.durationHours !== undefined
               ? `${currentStage.durationHours}h`
@@ -507,7 +608,10 @@ function TaskList({ tasks, writers, onOpen, onAssign }) {
                   <span>{task.id} · {task.product} · Hook: <em>{task.hookName || "Not set"}</em></span>
                 </td>
                 <td><BriefBadge task={task} /><span className="source">{sourceSheet(task)}</span></td>
-                <td><OwnerSelect task={task} writers={writers} onChange={onAssign} compact /></td>
+                <td>{isVideoTask
+                  ? <span className="inline-owner"><Avatar person={editor} small />{editor?.name || "Unassigned"}</span>
+                  : <OwnerSelect task={task} writers={writers} onChange={onAssign} compact />}
+                </td>
                 <td><Priority value={task.priority} /></td>
                 <td>{task.contentType}</td>
                 <td><strong>{durationLabel}</strong></td>
@@ -651,10 +755,12 @@ function ScriptHandoffSection({ task, role, onSubmitScript, onSubmitVideo, onGoL
   );
 }
 
-function Drawer({ task, role, users, writers, onClose, onAssign, onSubmitScript, onSubmitVideo, onGoLive, onBrandDecision, onReleaseDraftBrief }) {
+function Drawer({ task, role, users, writers, editors, canAssignEditor, onClose, onAssign, onAssignEditor, onSubmitScript, onSubmitVideo, onGoLive, onBrandDecision, onReleaseDraftBrief }) {
   const [tab, setTab] = useState("overview");
   if (!task) return null;
   const writer = users.find((person) => person.id === (task.scriptOwnerId || task.contentOwnerId));
+  const editor = users.find((person) => person.id === task.editorId);
+  const isVideoTask = ["editing_queue", "editing_in_progress", "changes_requested", "approval_pending"].includes(task.state);
   const metrics = computePipelineMetrics(task);
 
   return (
@@ -711,12 +817,16 @@ function Drawer({ task, role, users, writers, onClose, onAssign, onSubmitScript,
                 </div>
                 <div className="detail-grid">
                   <div>
-                    <label>Assigned Owner</label>
-                    <OwnerSelect task={task} writers={writers} onChange={onAssign} />
+                    <label>{isVideoTask ? "Assigned Editor" : "Assigned Owner"}</label>
+                    {isVideoTask
+                      ? (canAssignEditor
+                        ? <EditorSelect task={task} editors={editors} onChange={onAssignEditor} />
+                        : <span className="inline-owner"><Avatar person={editor} small />{editor?.name || "Unassigned"}</span>)
+                      : <OwnerSelect task={task} writers={writers} onChange={onAssign} />}
                   </div>
                   <div>
                     <label>Current Owner</label>
-                    <span className="inline-owner"><Avatar person={writer} small />{writer?.name || "Unassigned"}</span>
+                    <span className="inline-owner"><Avatar person={isVideoTask ? editor : writer} small />{(isVideoTask ? editor : writer)?.name || "Unassigned"}</span>
                   </div>
                   <div>
                     <label>Priority</label>
@@ -1080,6 +1190,10 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
   const currentUser = users.find((p) => p.id === currentUserId) || sessionUser || users[0];
   const currentRole = currentUser?.role || "brand";
   const normalizedTeam = normalizeRole(currentRole);
+  const isEditingManager = ["edit", "video"].includes(currentRole) && Boolean(currentUser?.isTeamLead);
+  const editors = users.filter((person) =>
+    ["edit", "video"].includes(person.role) && !person.isTeamLead && !person.isFallback
+  );
 
   const handleSignOut = async () => {
     try {
@@ -1241,8 +1355,15 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
       });
     }
 
+    if (["edit", "video"].includes(currentRole)) {
+      // Managers share the complete editing queue. Individual editors only see their work.
+      return currentUser?.isTeamLead
+        ? teamTasks
+        : teamTasks.filter((task) => task.editorId === currentUserId);
+    }
+
     return teamTasks;
-  }, [tasks, normalizedTeam, currentRole, currentUserId]);
+  }, [tasks, normalizedTeam, currentRole, currentUserId, currentUser?.isTeamLead]);
 
   // Toolbar Filter
   const filtered = useMemo(() => {
@@ -1284,6 +1405,22 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
         )
       );
       showToast("Owner assignment updated");
+    }
+  };
+
+  const assignEditor = async (taskId, editorId) => {
+    try {
+      const res = await fetch(`/api/tasks/${taskId}/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ editorId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Editor assignment failed");
+      setTasks((items) => items.map((task) => (task.id === taskId ? data.task : task)));
+      showToast(editorId ? "Editor assigned — all manager dashboards updated" : "Returned to unassigned queue");
+    } catch (error) {
+      showToast(error.message || "Failed to assign editor");
     }
   };
 
@@ -1456,12 +1593,12 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
       const current = tasks.find((t) => t.id === taskId) || updated;
       if (decision === "approved") {
         if (type === "script") {
-          const editor = users.find((u) => u.id === updated.editorId) || users.find((u) => u.role === "video" || u.role === "edit");
+          const editor = users.find((u) => u.isTeamLead && (u.role === "video" || u.role === "edit"));
           dispatchWorkflowHandoffNotification({
             targetTeam: "video",
             eventType: NOTIFICATION_EVENTS.SCRIPT_APPROVED,
-            title: "Script Approved — Video Production",
-            message: `Script approved for "${current.title}" (${current.id}) by ${currentUser?.name}. Video cutting can begin.`,
+            title: "Script Approved — Assignment Needed",
+            message: `Script approved for "${current.title}" (${current.id}) by ${currentUser?.name}. An editing manager must assign an editor.`,
             task: updated,
             recipientUser: editor,
           });
@@ -1536,7 +1673,7 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
           {(currentRole === "edit" || currentRole === "video") && (
             <button className="active">
               <Video size={20} />
-              <span>Video Team</span>
+              <span>{isEditingManager ? "Editing Dispatch" : "My Editing Queue"}</span>
             </button>
           )}
           {currentRole === "performance" && (
@@ -1727,7 +1864,7 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
               <h1>
                 {currentRole === "brand" ? "Brand Workspace" :
                  currentRole === "content" ? "Content Scripts" :
-                 currentRole === "edit" || currentRole === "video" ? "Video Production" :
+                 currentRole === "edit" || currentRole === "video" ? (isEditingManager ? "Editing Dispatch Desk" : "My Video Production") :
                  currentRole === "performance" ? "Performance Go-Live" :
                  "Operations Overview"}
               </h1>
@@ -1748,7 +1885,7 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
               <h2>
                 {currentRole === "brand" ? "Intake & Approval Gates" :
                  currentRole === "content" ? "Scripting Queue" :
-                 currentRole === "edit" || currentRole === "video" ? "Video Production Queue" :
+                 currentRole === "edit" || currentRole === "video" ? (isEditingManager ? "Shared Manager Assignment Queue" : "My Assigned Videos") :
                  "Go-Live & Campaigns"}
               </h2>
               <div className="queue-stats">
@@ -1806,7 +1943,7 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
 
             <span className="result-count">{filtered.length} {brief === "ai" ? "AI" : "video"} tasks</span>
 
-            {!isBrandTeam && (
+            {!isBrandTeam && !isEditingManager && (
               <div className="view-toggle">
                 <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}><List size={18} />List</button>
                 <button className={view === "board" ? "active" : ""} onClick={() => setView("board")}><LayoutDashboard size={18} />Board</button>
@@ -1815,7 +1952,15 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
           </section>
 
           {/* Brand Team: Folder Explorer / Other Teams (Video, Content, Perf, Admin): Kanban Board or List */}
-          {isBrandTeam ? (
+          {isEditingManager ? (
+            <EditingDispatchDesk
+              tasks={filtered}
+              editors={editors}
+              users={users}
+              onOpen={(task) => setSelectedId(task.id)}
+              onAssign={assignEditor}
+            />
+          ) : isBrandTeam ? (
             <BrandFolderView
               tasks={filtered}
               onOpen={(t) => setSelectedId(t.id)}
@@ -1837,6 +1982,7 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
             <TaskList
               tasks={filtered}
               writers={writers}
+              users={users}
               onOpen={(t) => setSelectedId(t.id)}
               onAssign={assignWriter}
             />
@@ -1850,8 +1996,11 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
         role={currentRole}
         users={users}
         writers={writers}
+        editors={editors}
+        canAssignEditor={isEditingManager || currentRole === "administrator"}
         onClose={() => setSelectedId(null)}
         onAssign={assignWriter}
+        onAssignEditor={assignEditor}
         onSubmitScript={handleSubmitScript}
         onSubmitVideo={handleSubmitVideo}
         onGoLive={handleGoLive}
