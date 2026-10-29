@@ -116,3 +116,5 @@ plix-unified-ops/
 
 After creating the four manager accounts in Supabase Auth, set their `workspace_members.team` to `video` and `team_role` to `manager`. All other editors should use `team_role = 'member'`. The manager API also enforces assignment permissions from the active application session.
 
+Yashasvi uses the overall Operations Admin dashboard. Set her `workspace_members.team` to `administrator`; this view covers every workflow tab, stage turnaround, approval wait time, handoff activity, and task-level total TAT.
+

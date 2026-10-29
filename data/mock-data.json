@@ -13,7 +13,7 @@
     { "id": "usr-vihang", "name": "Vihang", "role": "edit", "initials": "V", "tone": "green", "isTeamLead": true },
     { "id": "usr-pratik", "name": "Pratik", "role": "edit", "initials": "P", "tone": "amber", "isTeamLead": true },
     { "id": "usr-pritam", "name": "Pritam", "role": "edit", "initials": "P", "tone": "violet", "isTeamLead": true },
-    { "id": "usr-yashasvi", "name": "Yashasvi", "role": "edit", "initials": "Y", "tone": "green" },
+    { "id": "usr-yashasvi", "name": "Yashasvi", "role": "administrator", "initials": "Y", "tone": "green" },
     { "id": "usr-isha", "name": "Isha Rao", "role": "brand", "initials": "IR", "tone": "amber" },
     { "id": "usr-leo", "name": "Leo Martins", "role": "performance", "initials": "LM", "tone": "green" },
     { "id": "usr-himani", "name": "Himani", "role": "content", "initials": "H", "tone": "violet" },

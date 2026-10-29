@@ -7,6 +7,7 @@ import {
   PlayCircle, Plus, Rocket, Search, Send, Smartphone, Sparkles, Video, X
 } from "lucide-react";
 import { CATEGORY_ROUTING, CONTENT_TYPES_BY_BRIEF, TEAM_VISIBLE_STATES } from "@/lib/workflow/constants";
+import { TEAM_USERS } from "@/lib/auth/users";
 import plixProductsCatalog from "@/data/plix-products.json";
 import { computePipelineMetrics } from "@/lib/workflow/engine";
 import {
@@ -176,6 +177,117 @@ function EditorSelect({ task, editors, onChange, compact = false }) {
   );
 }
 
+function smoothChartPath(points) {
+  if (!points.length) return "";
+  return points.slice(1).reduce((path, point, index) => {
+    const previous = points[index];
+    const midpoint = (previous.x + point.x) / 2;
+    return `${path} C ${midpoint} ${previous.y}, ${midpoint} ${point.y}, ${point.x} ${point.y}`;
+  }, `M ${points[0].x} ${points[0].y}`);
+}
+
+function ManagerWorkloadChart({ tasks, editors, users }) {
+  const stages = [
+    { label: "Unassigned", value: tasks.filter((task) => task.state === "editing_queue" && !task.editorId).length },
+    { label: "Assigned", value: tasks.filter((task) => task.state === "editing_queue" && task.editorId).length },
+    { label: "Production", value: tasks.filter((task) => task.state === "editing_in_progress").length },
+    { label: "Rework", value: tasks.filter((task) => task.state === "changes_requested").length },
+    { label: "Brand review", value: tasks.filter((task) => task.state === "approval_pending").length },
+  ];
+  const managers = users.filter((user) => user.isTeamLead && ["edit", "video"].includes(user.role));
+  const maxValue = Math.max(4, ...stages.map((stage) => stage.value));
+  const chartTop = 45;
+  const chartBottom = 210;
+  const chartLeft = 58;
+  const chartRight = 682;
+  const points = stages.map((stage, index) => ({
+    ...stage,
+    x: chartLeft + (index * (chartRight - chartLeft)) / (stages.length - 1),
+    y: chartBottom - (stage.value / maxValue) * (chartBottom - chartTop),
+  }));
+  const linePath = smoothChartPath(points);
+  const areaPath = `${linePath} L ${chartRight} ${chartBottom} L ${chartLeft} ${chartBottom} Z`;
+  const busiestIndex = stages.reduce((highest, stage, index) => stage.value > stages[highest].value ? index : highest, 0);
+  const [selectedIndex, setSelectedIndex] = useState(busiestIndex);
+  const focusIndex = Math.min(selectedIndex, stages.length - 1);
+  const focus = points[focusIndex];
+  const gridValues = [maxValue, Math.round(maxValue * 0.66), Math.round(maxValue * 0.33), 0];
+
+  return (
+    <section className="manager-workload-card">
+      <div className="manager-chart-copy">
+        <span className="manager-chart-kicker">LIVE EDITING FLOW</span>
+        <h2>Team workload</h2>
+        <p>See where every approved script is sitting before assigning the next edit.</p>
+        <div className="manager-roster">
+          <div className="manager-avatar-stack">
+            {managers.map((manager) => <Avatar key={manager.id} person={manager} small />)}
+          </div>
+          <span>{managers.length} managers · {editors.length} editors</span>
+        </div>
+      </div>
+
+      <div className="manager-chart-visual">
+        <svg viewBox="0 0 720 260" role="img" aria-label="Editing workload across assignment stages">
+          <defs>
+            <linearGradient id="manager-area-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#5eead4" stopOpacity="0.72" />
+              <stop offset="65%" stopColor="#38bdf8" stopOpacity="0.22" />
+              <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="manager-line-gradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#69f4d5" />
+              <stop offset="100%" stopColor="#60a5fa" />
+            </linearGradient>
+            <filter id="manager-point-glow" x="-200%" y="-200%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation="7" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+
+          {gridValues.map((value, index) => {
+            const y = chartTop + (index * (chartBottom - chartTop)) / (gridValues.length - 1);
+            return (
+              <g key={`${value}-${index}`}>
+                <line x1="52" x2="692" y1={y} y2={y} className="manager-chart-grid" />
+                <text x="8" y={y + 4} className="manager-chart-scale">{value}</text>
+              </g>
+            );
+          })}
+
+          <rect x={focus.x - 52} y="21" width="104" height="205" rx="15" className="manager-chart-focus" />
+          <path d={areaPath} fill="url(#manager-area-gradient)" />
+          <path d={linePath} fill="none" stroke="url(#manager-line-gradient)" strokeWidth="7" strokeLinecap="round" />
+
+          {points.map((point, index) => (
+            <g
+              key={point.label}
+              className="manager-chart-hit"
+              role="button"
+              tabIndex={0}
+              aria-label={`Show ${point.label}: ${point.value} items`}
+              onClick={() => setSelectedIndex(index)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") setSelectedIndex(index);
+              }}
+            >
+              <rect x={point.x - 55} y="28" width="110" height="220" fill="transparent" />
+              <circle cx={point.x} cy={point.y} r={index === focusIndex ? 9 : 5} className="manager-chart-point" filter={index === focusIndex ? "url(#manager-point-glow)" : undefined} />
+              <text x={point.x} y="244" textAnchor="middle" className="manager-chart-label">{point.label}</text>
+            </g>
+          ))}
+
+          <g className="manager-chart-tooltip" transform={`translate(${Math.min(610, Math.max(18, focus.x - 54))} 30)`}>
+            <rect width="108" height="61" rx="12" />
+            <text x="54" y="22" textAnchor="middle">{focus.label}</text>
+            <text x="54" y="48" textAnchor="middle" className="manager-chart-tooltip-value">{focus.value}</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+  );
+}
+
 function EditingDispatchDesk({ tasks, editors, users, onOpen, onAssign }) {
   const groups = [
     {
@@ -206,6 +318,7 @@ function EditingDispatchDesk({ tasks, editors, users, onOpen, onAssign }) {
 
   return (
     <section className="dispatch-desk">
+      <ManagerWorkloadChart tasks={tasks} editors={editors} users={users} />
       <div className="dispatch-summary">
         <div><strong>{groups[0].items.length}</strong><span>Unassigned scripts</span></div>
         <div><strong>{groups[1].items.length}</strong><span>Assigned, waiting to start</span></div>
@@ -255,6 +368,272 @@ function EditingDispatchDesk({ tasks, editors, users, onOpen, onAssign }) {
           </section>
         ))}
       </div>
+    </section>
+  );
+}
+
+const OPERATIONS_TABS = [
+  { id: "all", label: "All workflow", states: null },
+  { id: "intake", label: "Brand intake", states: ["draft"] },
+  { id: "scripting", label: "Scripting", states: ["social_research", "script_changes_requested"] },
+  { id: "script_review", label: "Script approval", states: ["script_approval_pending"] },
+  { id: "editing", label: "Editing", states: ["editing_queue", "editing_in_progress", "changes_requested"] },
+  { id: "video_review", label: "Video approval", states: ["approval_pending"] },
+  { id: "performance", label: "Performance", states: ["ready_for_performance", "publishing_in_progress", "publishing_failed"] },
+  { id: "live", label: "Live", states: ["published"] },
+];
+
+const OPERATIONS_STAGE_METRICS = [
+  { id: "brand_intake", label: "Brand intake" },
+  { id: "content_scripting", label: "Content scripting" },
+  { id: "brand_script_review", label: "Script approval" },
+  { id: "video_production", label: "Video production" },
+  { id: "brand_video_review", label: "Video approval" },
+  { id: "perf_publishing", label: "Performance setup" },
+];
+
+function elapsedStageHours(stage) {
+  if (!stage) return 0;
+  if (Number.isFinite(Number(stage.durationHours))) return Number(stage.durationHours);
+  const started = new Date(stage.startedAt).getTime();
+  const ended = stage.completedAt ? new Date(stage.completedAt).getTime() : Date.now();
+  if (!Number.isFinite(started) || !Number.isFinite(ended)) return 0;
+  return Math.max(0, (ended - started) / 3600000);
+}
+
+function formatHours(value) {
+  const hours = Number(value) || 0;
+  if (hours < 1) return `${Math.max(0, Math.round(hours * 60))}m`;
+  if (hours < 24) return `${hours.toFixed(hours < 10 ? 1 : 0)}h`;
+  return `${(hours / 24).toFixed(hours < 72 ? 1 : 0)}d`;
+}
+
+function taskStageHours(task, stageId) {
+  return (task.stageDurations || [])
+    .filter((stage) => stage.stage === stageId)
+    .reduce((total, stage) => total + elapsedStageHours(stage), 0);
+}
+
+function averageStageHours(tasks, stageId) {
+  const values = tasks.map((task) => taskStageHours(task, stageId)).filter((value) => value > 0);
+  return values.length ? values.reduce((total, value) => total + value, 0) / values.length : 0;
+}
+
+function OperationsFlowChart({ tasks, activeStage, onSelectStage }) {
+  const stages = [
+    { id: "intake", label: "Intake", states: ["draft"] },
+    { id: "scripting", label: "Scripting", states: ["social_research", "script_changes_requested"] },
+    { id: "script_review", label: "Script approval", states: ["script_approval_pending"] },
+    { id: "editing", label: "Editing", states: ["editing_queue", "editing_in_progress", "changes_requested"] },
+    { id: "video_review", label: "Video approval", states: ["approval_pending"] },
+    { id: "performance", label: "Performance", states: ["ready_for_performance", "publishing_in_progress", "publishing_failed"] },
+    { id: "live", label: "Live", states: ["published"] },
+  ].map((stage) => ({ ...stage, value: tasks.filter((task) => stage.states.includes(task.state)).length }));
+  const maxValue = Math.max(4, ...stages.map((stage) => stage.value));
+  const chartTop = 46;
+  const chartBottom = 214;
+  const chartLeft = 55;
+  const chartRight = 725;
+  const points = stages.map((stage, index) => ({
+    ...stage,
+    x: chartLeft + (index * (chartRight - chartLeft)) / (stages.length - 1),
+    y: chartBottom - (stage.value / maxValue) * (chartBottom - chartTop),
+  }));
+  const linePath = smoothChartPath(points);
+  const areaPath = `${linePath} L ${chartRight} ${chartBottom} L ${chartLeft} ${chartBottom} Z`;
+  const busiestIndex = stages.reduce((highest, stage, index) => stage.value > stages[highest].value ? index : highest, 0);
+  const requestedIndex = stages.findIndex((stage) => stage.id === activeStage);
+  const focusIndex = requestedIndex >= 0 ? requestedIndex : busiestIndex;
+  const focus = points[focusIndex];
+  const gridValues = [maxValue, Math.round(maxValue * 0.66), Math.round(maxValue * 0.33), 0];
+
+  return (
+    <section className="manager-workload-card operations-flow-card">
+      <div className="manager-chart-copy">
+        <span className="manager-chart-kicker">LIVE END-TO-END FLOW</span>
+        <h2>Overall workflow</h2>
+        <p>Every active item across Brand, Content, Editing, Approvals, and Performance in one view.</p>
+        <div className="operations-graph-summary">
+          <span><b>{tasks.length}</b> total items</span>
+          <span><b>{focus.value}</b> {requestedIndex >= 0 ? "in selected stage" : "at busiest stage"}</span>
+        </div>
+      </div>
+
+      <div className="manager-chart-visual">
+        <svg viewBox="0 0 770 270" role="img" aria-label="Overall task volume across every workflow stage">
+          <defs>
+            <linearGradient id="operations-area-gradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#67e8f9" stopOpacity="0.75" />
+              <stop offset="62%" stopColor="#818cf8" stopOpacity="0.25" />
+              <stop offset="100%" stopColor="#0f172a" stopOpacity="0" />
+            </linearGradient>
+            <linearGradient id="operations-line-gradient" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stopColor="#5eead4" />
+              <stop offset="52%" stopColor="#67e8f9" />
+              <stop offset="100%" stopColor="#818cf8" />
+            </linearGradient>
+            <filter id="operations-point-glow" x="-200%" y="-200%" width="400%" height="400%">
+              <feGaussianBlur stdDeviation="7" result="blur" />
+              <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+
+          {gridValues.map((value, index) => {
+            const y = chartTop + (index * (chartBottom - chartTop)) / (gridValues.length - 1);
+            return (
+              <g key={`${value}-${index}`}>
+                <line x1="49" x2="741" y1={y} y2={y} className="manager-chart-grid" />
+                <text x="5" y={y + 4} className="manager-chart-scale">{value}</text>
+              </g>
+            );
+          })}
+
+          <rect x={focus.x - 48} y="20" width="96" height="210" rx="15" className="manager-chart-focus" />
+          <path d={areaPath} fill="url(#operations-area-gradient)" />
+          <path d={linePath} fill="none" stroke="url(#operations-line-gradient)" strokeWidth="7" strokeLinecap="round" />
+          {points.map((point, index) => (
+            <g
+              key={point.label}
+              className="manager-chart-hit"
+              role="button"
+              tabIndex={0}
+              aria-label={`Open ${point.label}: ${point.value} items`}
+              onClick={() => onSelectStage(point.id)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") onSelectStage(point.id);
+              }}
+            >
+              <rect x={point.x - 48} y="28" width="96" height="226" fill="transparent" />
+              <circle cx={point.x} cy={point.y} r={index === focusIndex ? 9 : 5} className="manager-chart-point" filter={index === focusIndex ? "url(#operations-point-glow)" : undefined} />
+              <text x={point.x} y="252" textAnchor="middle" className="manager-chart-label">{point.label}</text>
+            </g>
+          ))}
+          <g className="manager-chart-tooltip" transform={`translate(${Math.min(646, Math.max(12, focus.x - 54))} 29)`}>
+            <rect width="108" height="61" rx="12" />
+            <text x="54" y="22" textAnchor="middle">{focus.label}</text>
+            <text x="54" y="48" textAnchor="middle" className="manager-chart-tooltip-value">{focus.value}</text>
+          </g>
+        </svg>
+      </div>
+    </section>
+  );
+}
+
+function OperationsAdminOverview({ tasks, users, onOpen }) {
+  const [activeTab, setActiveTab] = useState("all");
+  const activeConfig = OPERATIONS_TABS.find((tab) => tab.id === activeTab) || OPERATIONS_TABS[0];
+  const visibleTasks = activeConfig.states
+    ? tasks.filter((task) => activeConfig.states.includes(task.state))
+    : tasks;
+  const stageAverages = OPERATIONS_STAGE_METRICS.map((stage) => ({
+    ...stage,
+    hours: averageStageHours(tasks, stage.id),
+  }));
+  const maxStageHours = Math.max(1, ...stageAverages.map((stage) => stage.hours));
+  const scriptApprovalHours = averageStageHours(tasks, "brand_script_review");
+  const videoApprovalHours = averageStageHours(tasks, "brand_video_review");
+  const totalCycleValues = tasks.map((task) => computePipelineMetrics(task).totalElapsedDays * 24).filter((value) => value > 0);
+  const averageCycleHours = totalCycleValues.length
+    ? totalCycleValues.reduce((total, value) => total + value, 0) / totalCycleValues.length
+    : 0;
+  const approvalWaiting = tasks.filter((task) => ["script_approval_pending", "approval_pending"].includes(task.state)).length;
+  const completedToday = tasks.filter((task) => {
+    if (task.state !== "published" || !task.updatedAt) return false;
+    return new Date(task.updatedAt).toDateString() === new Date().toDateString();
+  }).length;
+  const activity = visibleTasks
+    .flatMap((task) => (task.activity || []).map((entry) => ({ ...entry, task })))
+    .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())
+    .slice(0, 12);
+
+  return (
+    <section className="operations-overview">
+      <OperationsFlowChart tasks={tasks} activeStage={activeTab} onSelectStage={setActiveTab} />
+      <div className="operations-kpis">
+        <article><span>Total workflow items</span><strong>{tasks.length}</strong><small>Across every team and stage</small></article>
+        <article><span>Average total cycle</span><strong>{formatHours(averageCycleHours)}</strong><small>Brief creation to latest handoff</small></article>
+        <article><span>Waiting for approval</span><strong>{approvalWaiting}</strong><small>Script and video gates combined</small></article>
+        <article><span>Completed today</span><strong>{completedToday}</strong><small>Moved to live market</small></article>
+      </div>
+
+      <nav className="operations-tabs" aria-label="Workflow stages">
+        {OPERATIONS_TABS.map((tab) => {
+          const count = tab.states ? tasks.filter((task) => tab.states.includes(task.state)).length : tasks.length;
+          return (
+            <button key={tab.id} className={activeTab === tab.id ? "active" : ""} onClick={() => setActiveTab(tab.id)}>
+              <span>{tab.label}</span><b>{count}</b>
+            </button>
+          );
+        })}
+      </nav>
+
+      <div className="operations-insights-grid">
+        <section className="operations-panel operations-timing-panel">
+          <header><div><span className="eyebrow">TURNAROUND BY STAGE</span><h2>Where time is being spent</h2></div><small>Average recorded duration</small></header>
+          <div className="stage-time-bars">
+            {stageAverages.map((stage) => (
+              <div className="stage-time-row" key={stage.id}>
+                <span>{stage.label}</span>
+                <div><i style={{ width: `${Math.max(stage.hours ? 4 : 0, (stage.hours / maxStageHours) * 100)}%` }} /></div>
+                <strong>{formatHours(stage.hours)}</strong>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <section className="operations-panel approval-timing-panel">
+          <header><span className="eyebrow">APPROVAL HEALTH</span><h2>Decision turnaround</h2></header>
+          <div className="approval-time-card script"><span>Script approvals</span><strong>{formatHours(scriptApprovalHours)}</strong><small>Average Brand decision time</small></div>
+          <div className="approval-time-card video"><span>Video approvals</span><strong>{formatHours(videoApprovalHours)}</strong><small>Average Brand decision time</small></div>
+          <div className="approval-waiting"><b>{approvalWaiting}</b><span>items are currently waiting at an approval gate</span></div>
+        </section>
+
+        <section className="operations-panel operations-activity-panel">
+          <header><div><span className="eyebrow">WHAT HAPPENED WHERE</span><h2>Latest handoffs</h2></div></header>
+          <div className="operations-activity-list">
+            {activity.map((entry, index) => (
+              <button key={`${entry.task.id}-${entry.at}-${index}`} onClick={() => onOpen(entry.task)}>
+                <i />
+                <span><strong>{entry.task.id} · {entry.actor || "System"}</strong><small>{entry.text}</small></span>
+                <time>{formatDateTime(entry.at)}</time>
+              </button>
+            ))}
+            {!activity.length && <div className="column-empty"><Check size={18} /><span>No recorded activity in this tab</span></div>}
+          </div>
+        </section>
+      </div>
+
+      <section className="operations-table-panel">
+        <header>
+          <div><span className="eyebrow">DETAILED OVERVIEW</span><h2>{activeConfig.label}</h2></div>
+          <span>{visibleTasks.length} items · showing up to 80</span>
+        </header>
+        <div className="operations-table-wrap">
+          <table>
+            <thead><tr><th>Work item</th><th>Current stage</th><th>Current wait</th><th>Script approval</th><th>Video approval</th><th>Total TAT</th><th>Last movement</th></tr></thead>
+            <tbody>
+              {visibleTasks.slice(0, 80).map((task) => {
+                const metrics = computePipelineMetrics(task);
+                const currentStage = (task.stageDurations || []).slice(-1)[0];
+                const currentWait = currentStage && !currentStage.completedAt
+                  ? elapsedStageHours(currentStage)
+                  : Math.max(0, (Date.now() - new Date(task.updatedAt || Date.now()).getTime()) / 3600000);
+                return (
+                  <tr key={task.id} onClick={() => onOpen(task)}>
+                    <td><strong>{task.title}</strong><span>{task.id} · {task.product}</span></td>
+                    <td><Status state={task.state} /></td>
+                    <td><strong>{formatHours(currentWait)}</strong></td>
+                    <td>{formatHours(taskStageHours(task, "brand_script_review"))}</td>
+                    <td>{formatHours(taskStageHours(task, "brand_video_review"))}</td>
+                    <td><strong>{formatHours(metrics.totalElapsedDays * 24)}</strong></td>
+                    <td>{formatDateTime(task.updatedAt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </section>
   );
 }
@@ -1182,12 +1561,18 @@ function NewBriefModal({ onClose, onSubmit }) {
 }
 
 export default function UnifiedDashboard({ initialTasks = [], initialUsers = [], initialNotifications = [], sessionUser = null }) {
-  const users = useMemo(() => dedupeUsers(initialUsers), [initialUsers]);
+  const users = useMemo(() => {
+    const authById = new Map(TEAM_USERS.map((user) => [user.id, user]));
+    const merged = initialUsers.map((user) => ({ ...user, ...(authById.get(user.id) || {}) }));
+    const stateIds = new Set(initialUsers.map((user) => user.id));
+    return dedupeUsers([...merged, ...TEAM_USERS.filter((user) => !stateIds.has(user.id))]);
+  }, [initialUsers]);
   const writers = users.filter((p) => p.role === "content");
 
   // User Identity & Role Authentication strictly bound to authenticated login session
   const currentUserId = sessionUser?.id || "usr-isha";
-  const currentUser = users.find((p) => p.id === currentUserId) || sessionUser || users[0];
+  const stateUser = users.find((p) => p.id === currentUserId);
+  const currentUser = stateUser || sessionUser ? { ...(stateUser || {}), ...(sessionUser || {}) } : users[0];
   const currentRole = currentUser?.role || "brand";
   const normalizedTeam = normalizeRole(currentRole);
   const isEditingManager = ["edit", "video"].includes(currentRole) && Boolean(currentUser?.isTeamLead);
@@ -1377,6 +1762,11 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
       );
     });
   }, [roleTasks, search, brief, priority, status]);
+
+  const operationsTasks = useMemo(() => roleTasks.filter((task) => {
+    const haystack = [task.id, task.title, task.hookName, task.product, task.category, task.contentType, task.state].join(" ").toLowerCase();
+    return !search || haystack.includes(search.toLowerCase());
+  }), [roleTasks, search]);
 
   const selected = tasks.find((t) => t.id === selectedId);
   const columns = ROLE_COLUMNS[currentRole] || ROLE_COLUMNS.content;
@@ -1878,6 +2268,14 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
             )}
           </div>
 
+          {currentRole === "administrator" ? (
+            <OperationsAdminOverview
+              tasks={operationsTasks}
+              users={users}
+              onOpen={(task) => setSelectedId(task.id)}
+            />
+          ) : (
+          <>
           {/* Hero Grid */}
           <div className="hero-grid">
             <section className="queue-card">
@@ -1986,6 +2384,8 @@ export default function UnifiedDashboard({ initialTasks = [], initialUsers = [],
               onOpen={(t) => setSelectedId(t.id)}
               onAssign={assignWriter}
             />
+          )}
+          </>
           )}
         </main>
       </div>
